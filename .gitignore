@@ -1,0 +1,31 @@
+# Data, outputs and checkpoints
+data/
+datasets/
+runs/
+results/
+results_ssl/
+outputs/
+checkpoints/
+weights/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.npy
+*.npz
+*.zip
+*.tar
+*.tar.gz
+# local config, logs and environment
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+*.log
+.DS_Store
+# external repositories (download per upstream instructions)
+src/ssl/mae/official_mae/

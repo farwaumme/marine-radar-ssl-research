@@ -1,0 +1,11 @@
+# Install a CUDA-compatible torch/torchvision pair separately (see README).
+numpy
+pandas
+Pillow
+tqdm
+matplotlib
+timm==1.0.20
+huggingface-hub==0.35.3
+safetensors==0.6.2
+einops==0.8.1
+# LeJEPA SIGReg and official MAE/DINOv2 implementations are external dependencies.
