@@ -4,12 +4,50 @@ Research-code organization for radar SSL pretraining, supervised encoder–decod
 
 ## Research workflow
 
-1. Prepare radar inputs and document their provenance. The three-source experiment uses Pohang, professor-provided clean Cartesian radar images, and pseudo-intensity grayscale MOANA images. Other included scripts target a **different five-source inventory**.
+1. Prepare radar inputs and document their provenance. The three-source experiment uses Pohang, an own private Cartesian radar dataset, and pseudo-intensity grayscale MOANA images. Other included scripts target a **different five-source inventory**.
 2. Pretrain MAE, LeJEPA, or a **DINOv2-style** encoder on unlabeled radar images.
 3. Fine-tune an encoder + ViT/U-Net-like segmentation decoder with labeled radar masks.
 4. Export held-out test predictions and compare metrics using identical evaluation settings.
 
 **Not included:** raw datasets, model weights, original upstream MAE source, a verified MOANA preprocessing script, or an I-JEPA implementation. This repository is not an official MAE/DINOv2/LeJEPA implementation.
+
+## Supervised semantic segmentation benchmarks
+
+Six encoder configurations were evaluated within a U-Net segmentation framework on **open marine radar datasets** (prototype testing). These results are distinct from the private-dataset SSL pretraining inventory and from the earlier SSL downstream comparison below.
+
+| Configuration | Main feature-extraction approach |
+|---|---|
+| Custom CNN + U-Net | Convolution blocks trained from scratch |
+| ResNet-18 + U-Net | Lightweight residual encoder |
+| ResNet-34 + U-Net | Deeper residual encoder |
+| EfficientNet-B0 + U-Net | Efficient convolutional feature extraction |
+| ConvNeXt-Tiny + U-Net | Modern convolutional architecture |
+| Swin-Tiny + U-Net | Hierarchical shifted-window attention |
+
+### Prototype results — supervised U-Net encoders
+
+| Model / encoder | Val Dice | Test Dice | Test IoU | Precision | Recall | Time (ms/image) |
+|---|---:|---:|---:|---:|---:|---:|
+| Custom U-Net | 0.8879 | 0.8830 | 0.7967 | 0.8667 | 0.9003 | 19.24 |
+| ResNet-34 | 0.9197 | 0.9091 | 0.8372 | 0.9202 | 0.8990 | 9.73 |
+| **EfficientNet-B0** | **0.9252** | **0.9234** | **0.8612** | 0.9200 | **0.9270** | 10.54 |
+| ResNet-18 | 0.9219 | 0.9142 | 0.8457 | 0.9211 | 0.9075 | **7.24** |
+| ConvNeXt-Tiny | 0.9231 | 0.9224 | 0.8598 | 0.9200 | 0.9254 | 17.35 |
+| Swin-Tiny | 0.9198 | 0.9165 | 0.8501 | **0.9222** | 0.9109 | 17.66 |
+
+**Observation:** EfficientNet-B0 has the highest reported **test** Dice (0.9234) and test IoU (0.8612); ConvNeXt-Tiny is close (test Dice 0.9224). ResNet-18 has the lowest reported inference time (7.24 ms/image). These are supplied experimental results, not independently reproduced in this packaged repository. Statistical significance, recording-level independence, and cross-dataset generalization remain to be assessed. The evaluation protocol and hardware should be documented before making strong speed comparisons.
+
+### Earlier three-method SSL downstream segmentation results
+
+The following are reported results from an **earlier five-source experiment**; they must not be attributed to a current four-method run or directly treated as an apples-to-apples comparison against the supervised U-Net baselines.
+
+| SSL method + segmentation decoder | Best val Dice (%) | Test Dice (%) | Test IoU (%) | Precision (%) | Recall (%) |
+|---|---:|---:|---:|---:|---:|
+| **MAE-B/16** | **90.04** | **88.30** | **79.72** | **88.29** | **88.32** |
+| DINOv2-style-S/14 | 89.56 | 87.50 | 78.52 | 88.10 | 86.96 |
+| LeJEPA-S/14 | 88.14 | 86.33 | 76.84 | 86.64 | 86.03 |
+
+MAE has the highest reported test Dice in this earlier SSL comparison: 0.80 percentage points above DINOv2-style and 1.97 points above LeJEPA. Differences in architectures and evaluation settings mean these numbers do **not** establish SSL superiority over the six supervised baselines.
 
 ## Repository layout
 
@@ -35,7 +73,7 @@ marine-radar-ssl-research/
 Requires Python 3.11+ (Python 3.12 was used in some earlier local experiments), an appropriate NVIDIA driver and a PyTorch build matching your CUDA environment. **These dependency versions have not been tested together in this packaged layout.**
 
 ```bash
-git clone https://github.com/<YOUR-USERNAME>/marine-radar-ssl-research.git
+git clone https://github.com/farwaumme/marine-radar-ssl-research.git
 cd marine-radar-ssl-research
 python3 -m venv .venv
 source .venv/bin/activate
@@ -56,11 +94,13 @@ python src/ssl/dinov2/train_dinov2_all5_scratch.py --help
 
 ## Dataset preparation
 
-See [`docs/PREPROCESSING_PROTOCOL.md`](docs/PREPROCESSING_PROTOCOL.md) for the professor's exact MOANA instructions. In particular, trail/no-trail pixelwise equivalence is a **test to perform**, not an established result.
+See [`docs/PREPROCESSING_PROTOCOL.md`](docs/PREPROCESSING_PROTOCOL.md) for the MOANA preprocessing protocol. In particular, trail/no-trail pixelwise equivalence is a **test to perform**, not an established result.
 
-For the reported three-source pretraining selection: Pohang **11,047**, professor clean Cartesian **1,800**, MOANA grayscale Method C **38,292**, total **51,139**. These are historical experiment counts, **not** the default inventory for every uploaded script. An additional 8,500 converted MOANA frames were not in that selected subset; exclusion reasons need manifest verification.
+For the reported three-source pretraining selection: Pohang **11,047**, own private Cartesian **1,800**, MOANA grayscale Method C **38,292**, total **51,139**. These are historical experiment counts, **not** the default inventory for every uploaded script. An additional 8,500 converted MOANA frames were not in that selected subset; exclusion reasons need manifest verification.
 
 Store datasets outside Git, e.g. `data/` (ignored), and create a machine-local JSON manifest. Do not commit absolute personal file paths, dataset images, proprietary data, or checkpoints.
+
+**CLI compatibility note:** The existing Python scripts use the command-line option `--professor-root`. This option name is retained in the examples because changing it only in the README would break the commands. It points to the **own private dataset** path; renaming the actual option to `--private-root` requires coordinated changes to the Python code and inventory helpers.
 
 ## Training commands
 
@@ -72,7 +112,7 @@ The following are **CLI examples, not verified end-to-end reproductions**. Repla
 # Obtain official_mae first (see above).
 python src/ssl/mae/train_mae_manifest.py \
   --reference-manifest /PATH/TO/reference_manifest.json \
-  --professor-root /PATH/TO/professor_dataset \
+  --professor-root /PATH/TO/own_private_dataset \
   --output runs/mae_scratch --epochs 100 --batch-size 8
 ```
 
@@ -81,7 +121,7 @@ python src/ssl/mae/train_mae_manifest.py \
 ```bash
 python src/ssl/lejepa/train_lejepa_all5_scratch.py \
   --training-manifest /PATH/TO/training_manifest.json \
-  --professor-root /PATH/TO/professor_dataset \
+  --professor-root /PATH/TO/own_private_dataset \
   --output runs/lejepa_scratch --init scratch --epochs 100 --batch-size 8
 ```
 
@@ -90,7 +130,7 @@ python src/ssl/lejepa/train_lejepa_all5_scratch.py \
 ```bash
 python src/ssl/dinov2/train_dinov2_all5_scratch.py \
   --training-manifest /PATH/TO/training_manifest.json \
-  --professor-root /PATH/TO/professor_dataset \
+  --professor-root /PATH/TO/own_private_dataset \
   --output runs/dinov2_scratch --init scratch --epochs 100 --batch-size 8
 ```
 
