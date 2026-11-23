@@ -9,7 +9,7 @@ Research-code organization for radar SSL pretraining, supervised encoder–decod
 3. Fine-tune an encoder + ViT/U-Net-like segmentation decoder with labeled radar masks.
 4. Export held-out test predictions and compare metrics using identical evaluation settings.
 
-**Not included:** raw datasets, model weights, original upstream MAE source, a verified MOANA preprocessing script, or an I-JEPA implementation. This repository is not an official MAE/DINOv2/LeJEPA implementation.
+**Not included:** raw datasets, model weights, original upstream MAE source, a verified MOANA preprocessing script, the newer four-method fine-tuning script, or an I-JEPA implementation. This repository is not an official MAE/DINOv2/LeJEPA implementation.
 
 ## Supervised semantic segmentation benchmarks
 
@@ -48,6 +48,40 @@ The following are reported results from an **earlier five-source experiment**; t
 | LeJEPA-S/14 | 88.14 | 86.33 | 76.84 | 86.64 | 86.03 |
 
 MAE has the highest reported test Dice in this earlier SSL comparison: 0.80 percentage points above DINOv2-style and 1.97 points above LeJEPA. Differences in architectures and evaluation settings mean these numbers do **not** establish SSL superiority over the six supervised baselines.
+
+### New four-method SSL experiment — three-source radar pretraining (51,139 images)
+
+This **separate, newer experiment** pretrained four compact SSL encoders from random initialization on the same selected three-source radar dataset, then transferred each newly trained encoder to a U-Net-style segmentation decoder. **No encoder checkpoints from the earlier five-source experiment were loaded.** The supervised segmentation stage used labeled image–mask pairs from the **Own Private Dataset** only.
+
+#### SSL pretraining dataset
+
+| Source | Training images |
+|---|---:|
+| Own Private Dataset — clean Cartesian radar images | 1,800 |
+| Pohang Canal radar images | 11,047 |
+| MOANA converted pseudo-intensity images | 38,292 |
+| **Total** | **51,139** |
+
+The MOANA representation was generated using the `C_continuous_HSV` conversion after trail removal. It is **heuristic pseudo-intensity**, not recovered physical radar intensity. The selected dataset used no-trace MOANA images for preprocessing verification rather than counting them as a fourth pretraining source.
+
+#### Supervised segmentation evaluation
+
+The downstream evaluation used **2,400** clean Cartesian image–mask pairs from the Own Private Dataset: **1,800 training**, **300 validation**, and **300 test**. Pohang and MOANA images contributed to SSL pretraining but **not** to supervised fine-tuning. All four methods used the same segmentation dataset, a newly initialized custom U-Net-style decoder, and a consistent fine-tuning protocol. Best epochs were selected using validation foreground macro Dice; test metrics are foreground-class macro averages over classes 1–3, excluding background.
+
+| SSL method | Best epoch | Test Dice (%) | Test IoU (%) |
+|---|---:|---:|---:|
+| **MAE** | 99 | **77.67** | **65.10** |
+| **I-JEPA** | 100 | **76.77** | **64.05** |
+| **DINOv2-style** | 100 | **73.79** | **60.62** |
+| **LeJEPA** | 100 | **72.10** | **58.59** |
+
+**Observation:** MAE had the highest test Dice and IoU in this four-method run. I-JEPA was second, **0.90 percentage points** behind MAE in test Dice. The figures are reported results for this particular experiment, not independent replications or evidence that one method is universally superior.
+
+**Experiment details:** All four SSL encoders were trained for 100 epochs (batch size 64), with 512 × 512 single-channel radar inputs. Each transferred encoder was fine-tuned for up to 100 epochs with a newly initialized decoder. The segmentation checkpoint was selected using validation Dice and evaluated on the 300-image test split. The image–mask audit found no identical decoded images across splits, but **recording-level independence has not been established**. Multi-seed variability and uncertainty estimates are not yet reported.
+
+**Code availability:** This README reports the newer **I-JEPA** experiment, but the packaged repository **does not currently include the corresponding I-JEPA implementation or the newer four-method fine-tuning script**. The training commands below document the older scripts already present; they should not be interpreted as instructions that reproduce these newer results without additional code and configuration.
+
+**Comparison caveat:** The earlier **five-source, three-method** SSL results above and this **three-source, four-method** experiment are distinct. Different training inventories, encoders, checkpoints, and evaluation protocols prevent a controlled cross-experiment performance claim.
 
 ## Repository layout
 
